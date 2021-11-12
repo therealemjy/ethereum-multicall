@@ -134,14 +134,16 @@ export class Multicall {
    * @param calls The calls
    */
   public async call(
-    contractCallContexts: ContractCallContext[] | ContractCallContext
+    contractCallContexts: ContractCallContext[] | ContractCallContext,
+    overrides?: any
   ): Promise<ContractCallResults> {
     if (!Array.isArray(contractCallContexts)) {
       contractCallContexts = [contractCallContexts];
     }
 
     const aggregateResponse = await this.execute(
-      this.buildAggregateCallContext(contractCallContexts)
+      this.buildAggregateCallContext(contractCallContexts),
+      overrides
     );
 
     const returnObject: ContractCallResults = {
@@ -325,14 +327,15 @@ export class Multicall {
    * @param calls The calls
    */
   private async execute(
-    calls: AggregateCallContext[]
+    calls: AggregateCallContext[],
+    overrides?: any
   ): Promise<AggregateResponse> {
     switch (this._executionType) {
       case ExecutionType.web3:
         return await this.executeWithWeb3(calls);
       case ExecutionType.ethers:
       case ExecutionType.customHttp:
-        return await this.executeWithEthersOrCustom(calls);
+        return await this.executeWithEthersOrCustom(calls, overrides);
       default:
         throw new Error(`${this._executionType} is not defined`);
     }
@@ -383,15 +386,15 @@ export class Multicall {
    * @param calls The calls
    */
   private async executeWithEthersOrCustom(
-    calls: AggregateCallContext[]
+    calls: AggregateCallContext[],
+    overrides?: any
   ): Promise<AggregateResponse> {
-    let ethersProvider = this.getTypedOptions<MulticallOptionsEthers>()
-      .ethersProvider;
+    let ethersProvider =
+      this.getTypedOptions<MulticallOptionsEthers>().ethersProvider;
 
     if (!ethersProvider) {
-      const customProvider = this.getTypedOptions<
-        MulticallOptionsCustomJsonRpcProvider
-      >();
+      const customProvider =
+        this.getTypedOptions<MulticallOptionsCustomJsonRpcProvider>();
       if (customProvider.nodeUrl) {
         ethersProvider = new ethers.providers.JsonRpcProvider(
           customProvider.nodeUrl
@@ -412,13 +415,15 @@ export class Multicall {
     if (this._options.tryAggregate) {
       const contractResponse = (await contract.callStatic.tryBlockAndAggregate(
         false,
-        this.mapCallContextToMatchContractFormat(calls)
+        this.mapCallContextToMatchContractFormat(calls),
+        overrides
       )) as AggregateContractResponse;
 
       return this.buildUpAggregateResponse(contractResponse, calls);
     } else {
       const contractResponse = (await contract.callStatic.aggregate(
-        this.mapCallContextToMatchContractFormat(calls)
+        this.mapCallContextToMatchContractFormat(calls),
+        overrides
       )) as AggregateContractResponse;
 
       return this.buildUpAggregateResponse(contractResponse, calls);
@@ -487,7 +492,7 @@ export class Multicall {
    * Get typed options
    */
   private getTypedOptions<T>(): T {
-    return (this._options as unknown) as T;
+    return this._options as unknown as T;
   }
 
   /**
